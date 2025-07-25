@@ -64,7 +64,8 @@ class dataset_creator_node:
         self.vel = Twist()
         self.vel_sub = rospy.Subscriber("/cmd_vel", Twist, self.callback_vel)
         self.action = 0.0
-        self.cv_image = np.zeros((480,640,3), np.uint8)
+        # self.cv_image = np.zeros((480,640,3), np.uint8)
+        self.cv_image = np.zeros((720, 1280, 3), np.uint8)
         self.cmd_dir = (0, 0, 0)
         self.episode = 1
         self.joy_sub = rospy.Subscriber("/joy", Joy, self.joy_callback)
@@ -77,7 +78,7 @@ class dataset_creator_node:
 
     def callback(self, data):
         try:
-            self.cv_image = self.bridge.imgmsg_to_cv2(data, "rgb8")
+            self.cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
         except CvBridgeError as e:
             print(e)
 
@@ -146,7 +147,8 @@ class dataset_creator_node:
             writer.writerow([episode, inter])
 
     def loop(self):
-        if self.cv_image.size != 640 * 480 * 3:
+        # if self.cv_image.size != 640 * 480 * 3:
+        if self.cv_image.size != 1280 * 720 * 3:
             return
         if self.cmd_dir == (0, 0, 0):
             return
@@ -160,10 +162,14 @@ class dataset_creator_node:
         img_left_uint8   = preprocess_for_mobilenet(cv_left_image)
         img_right_uint8  = preprocess_for_mobilenet(cv_right_image)
 
+        img_resize = resize(self.cv_image, (224, 224), mode='constant') 
+        img_all_resize = (img_resize * 255).astype(np.uint8)
+
         # 保存
         self.save_image("center", self.episode, img_center_uint8)
         self.save_image("left",   self.episode, img_left_uint8)
         self.save_image("right",  self.episode, img_right_uint8)
+        self.save_image("resize", self.episode, img_all_resize)
 
         views = [
             ("center", self.action),
