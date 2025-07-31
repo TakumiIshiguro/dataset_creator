@@ -2,6 +2,7 @@
 
 import numpy as np
 import roslib
+import math
 roslib.load_manifest('dataset_creator')
 import rospy
 import cv2
@@ -42,6 +43,50 @@ def simulate_left_right_crop(image):
 
     return left_image, right_image
 
+def simulate_left_right_disparity_from_crop(image, angle_deg=5, crop_ratio=0.9):
+    """
+    左右端をクロップし、それぞれに射影変換を適用する。
+    - 左画像は右に回転（右向き）
+    - 右画像は左に回転（左向き）
+    → これにより仮想的な視差の方向が実際のステレオカメラに近くなる
+
+    Parameters:
+        image (np.ndarray): 入力画像（H×W×C）
+        angle_deg (float): 射影変換角度
+        crop_ratio (float): クロップする画像の割合
+
+    Returns:
+        left_img (np.ndarray), right_img (np.ndarray)
+    """
+    h, w = image.shape[:2]
+    crop_size = int(min(h, w) * crop_ratio)
+    cx, cy = crop_size / 2, h / 2
+
+    left_crop  = image[:, :crop_size]
+    right_crop = image[:, w - crop_size:]
+
+    def warp_view(img, angle_deg):
+        horizontal_fov = 2.35
+        f = (crop_size / 1.5) / math.tan(horizontal_fov / 2)
+        K = np.array([[f, 0, cx],
+                      [0, f, cy],
+                      [0, 0, 1]])
+        angle_rad = math.radians(angle_deg)
+        R = np.array([[ math.cos(angle_rad), 0, math.sin(angle_rad)],
+                      [0, 1, 0],
+                      [-math.sin(angle_rad), 0, math.cos(angle_rad)]])
+        H = K @ R @ np.linalg.inv(K)
+        H /= H[2, 2]
+        return cv2.warpPerspective(img, H, (crop_size, h),
+                                   flags=cv2.INTER_LINEAR,
+                                   borderMode=cv2.BORDER_CONSTANT,
+                                   borderValue=0)
+
+    # ✨ 回転方向を左右反転 ✨
+    left_img  = warp_view(left_crop,  +angle_deg)  # 右向き
+    right_img = warp_view(right_crop, -angle_deg)  # 左向き
+
+    return left_img, right_img
 
 def preprocess_for_mobilenet(img):
     """
@@ -154,8 +199,7 @@ class dataset_creator_node:
             return
         print(self.episode)
 
-        # 左右視点画像をCropで再現
-        cv_left_image, cv_right_image = simulate_left_right_crop(self.cv_image)
+        cv_left_image, cv_right_image = simulate_left_right_disparity_from_crop(self.cv_image, angle_deg=5)
 
         # 画像をMobileNetV3用に前処理
         img_center_uint8 = preprocess_for_mobilenet(self.cv_image)
