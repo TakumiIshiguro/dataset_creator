@@ -18,73 +18,27 @@ import time
 from sensor_msgs.msg import Joy
 from std_srvs.srv import SetBool, SetBoolResponse
 
-def simulate_left_right_crop(image):
+def simulate_left_right_disparity_from_crop(image, angle_deg=5, fov_deg=90):
     """
-    入力画像から、左カメラ・右カメラ視点に相当する画像を生成する。
-
-    - 左カメラ視点: 左端から正方形をクロップ
-    - 右カメラ視点: 右端から正方形をクロップ
+    射影変換・リサイズを行わず、中央画像から左右視点画像を端からクロップして生成。
 
     Parameters:
-        image (np.ndarray): 入力画像（H×W×C）
+    - image: 入力画像（H×W×3）
+    - angle_deg: 無視（互換性のために残している）
+    - fov_deg: 無視（互換性のために残している）
 
     Returns:
-        left_image (np.ndarray): 左カメラ視点（左端をクロップ）
-        right_image (np.ndarray): 右カメラ視点（右端をクロップ）
+    - left_img: 左視点画像（画像左端から切り出し）
+    - right_img: 右視点画像（画像右端から切り出し）
     """
     h, w = image.shape[:2]
-    crop_size = min(h, w)
+    crop_width = int(w * 0.8)  # 中央画像と被らない程度にクロップ幅を設定
 
-    # 左カメラ視点 → 左端から正方形
-    left_image = image[:, :crop_size]
+    # 左端からクロップ
+    left_img = image[:, 0:crop_width]
 
-    # 右カメラ視点 → 右端から正方形
-    right_image = image[:, w - crop_size:]
-
-    return left_image, right_image
-
-def simulate_left_right_disparity_from_crop(image, angle_deg=5, crop_ratio=0.9):
-    """
-    左右端をクロップし、それぞれに射影変換を適用する。
-    - 左画像は右に回転（右向き）
-    - 右画像は左に回転（左向き）
-    → これにより仮想的な視差の方向が実際のステレオカメラに近くなる
-
-    Parameters:
-        image (np.ndarray): 入力画像（H×W×C）
-        angle_deg (float): 射影変換角度
-        crop_ratio (float): クロップする画像の割合
-
-    Returns:
-        left_img (np.ndarray), right_img (np.ndarray)
-    """
-    h, w = image.shape[:2]
-    crop_size = int(min(h, w) * crop_ratio)
-    cx, cy = crop_size / 2, h / 2
-
-    left_crop  = image[:, :crop_size]
-    right_crop = image[:, w - crop_size:]
-
-    def warp_view(img, angle_deg):
-        horizontal_fov = 2.35
-        f = (crop_size / 1.5) / math.tan(horizontal_fov / 2)
-        K = np.array([[f, 0, cx],
-                      [0, f, cy],
-                      [0, 0, 1]])
-        angle_rad = math.radians(angle_deg)
-        R = np.array([[ math.cos(angle_rad), 0, math.sin(angle_rad)],
-                      [0, 1, 0],
-                      [-math.sin(angle_rad), 0, math.cos(angle_rad)]])
-        H = K @ R @ np.linalg.inv(K)
-        H /= H[2, 2]
-        return cv2.warpPerspective(img, H, (crop_size, h),
-                                   flags=cv2.INTER_LINEAR,
-                                   borderMode=cv2.BORDER_CONSTANT,
-                                   borderValue=0)
-
-    # ✨ 回転方向を左右反転 ✨
-    left_img  = warp_view(left_crop,  +angle_deg)  # 右向き
-    right_img = warp_view(right_crop, -angle_deg)  # 左向き
+    # 右端からクロップ
+    right_img = image[:, w - crop_width:w]
 
     return left_img, right_img
 
