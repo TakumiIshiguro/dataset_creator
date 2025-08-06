@@ -42,6 +42,58 @@ def simulate_left_right_disparity_from_crop(image, angle_deg=5, fov_deg=90):
 
     return left_img, right_img
 
+# def simulate_left_right_disparity_from_crop(image, angle_deg=5, fov_deg=130):
+#     """
+#     射影変換を使って左右視点画像を生成する。
+#     入力画像の左右端を切り出し、それぞれに視点の回転（ヨー方向）を加える。
+
+#     Parameters:
+#     - image: 入力画像（H×W×3）
+#     - angle_deg: 左右の視点ずらし角度（度）
+#     - fov_deg: 水平方向の視野角（度）
+
+#     Returns:
+#     - left_img: 左視点画像
+#     - right_img: 右視点画像
+#     """
+#     h, w = image.shape[:2]
+#     crop_width = int(w * 0.8)
+
+#     # === 左右クロップ ===
+#     left_crop = image[:, 0:crop_width]
+#     right_crop = image[:, w - crop_width:w]
+
+#     # === カメラ内部行列Kを定義 ===
+#     fov_rad = math.radians(fov_deg)
+#     f = 0.5 * crop_width / math.tan(fov_rad / 2)
+#     cx = crop_width / 2
+#     cy = h / 2
+#     K = np.array([
+#         [f, 0, cx],
+#         [0, f, cy],
+#         [0, 0, 1]
+#     ])
+#     K_inv = np.linalg.inv(K)
+
+#     # === 射影変換用回転行列（ヨー回転） ===
+#     def get_yaw_homography(angle_rad):
+#         R = np.array([
+#             [math.cos(angle_rad), 0, math.sin(angle_rad)],
+#             [0, 1, 0],
+#             [-math.sin(angle_rad), 0, math.cos(angle_rad)]
+#         ])
+#         return K @ R @ K_inv
+
+#     angle_rad = math.radians(angle_deg)
+#     H_left = get_yaw_homography(-angle_rad)
+#     H_right = get_yaw_homography(angle_rad)
+
+#     # === warpPerspectiveで射影変換を適用 ===
+#     left_img = cv2.warpPerspective(left_crop, H_left, (crop_width, h), flags=cv2.INTER_LINEAR)
+#     right_img = cv2.warpPerspective(right_crop, H_right, (crop_width, h), flags=cv2.INTER_LINEAR)
+
+#     return left_img, right_img
+
 def preprocess_for_mobilenet(img):
     """
     MobileNetV3 用に画像を正方形にクロップし、224×224にリサイズしてuint8で返す
