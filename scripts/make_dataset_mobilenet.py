@@ -111,15 +111,15 @@ class dataset_creator_node:
         rospy.init_node('dataset_creator_node', anonymous=True)
         self.num = int(rospy.get_param("/dataset_creator_node/num", "1"))
         self.bridge = CvBridge()
-        self.image_sub = rospy.Subscriber("/camera_center/image_raw", Image, self.callback)
+        self.image_sub = rospy.Subscriber("/camera_center/image_raw", Image, self.callback, queue_size=1)
         self.vel = Twist()
-        self.vel_sub = rospy.Subscriber("/cmd_vel", Twist, self.callback_vel)
+        self.vel_sub = rospy.Subscriber("/cmd_vel", Twist, self.callback_vel, queue_size=1)
         self.action = 0.0
         # self.cv_image = np.zeros((480,640,3), np.uint8)
         self.cv_image = np.zeros((720, 1280, 3), np.uint8)
         self.cmd_dir = (0, 0, 0)
         self.episode = 1
-        self.joy_sub = rospy.Subscriber("/joy", Joy, self.joy_callback)
+        self.joy_sub = rospy.Subscriber("/joy", Joy, self.joy_callback, queue_size=1)
         self.joy_flg = False
         self.inter_flg = False
         self.loop_srv = rospy.Service('/loop_count', SetBool, self.callback_loop_count)
@@ -144,11 +144,13 @@ class dataset_creator_node:
         return resp
 
     def joy_callback(self, data):
-        if data.buttons[1] == 1:
-            self.joy_flg = True
-        if data.buttons[6] == 1:
+        # if data.buttons[1] == 1:
+        #     self.joy_flg = True
+        # if data.buttons[6] == 1:
+        if data.axes[2] < 0:
             self.cmd_dir = (0, 1, 0)
-        elif data.buttons[7] == 1:
+        # elif data.buttons[7] == 1:
+        elif data.axes[5] < 0:
             self.cmd_dir = (0, 0, 1)
         else:
             self.cmd_dir = (1, 0, 0)
